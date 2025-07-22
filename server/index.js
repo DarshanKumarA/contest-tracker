@@ -220,11 +220,8 @@ const fetchAndStoreContests = async () => {
     }
 };
 
-// --- YouTube Solution Finder & Past Contest Updater ---
-// --- YouTube Solution Finder & Past Contest Updater ---
-
 // This function calls the YouTube Data API to find a solution video
-const findYouTubeSolution = async (contestName) => {
+const findYouTubeSolution = async (contestName, contestEndTime) => {
     // We create a specific search query for better results
     const searchQuery = `"${contestName}" solution editorial`;
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
@@ -236,22 +233,23 @@ const findYouTubeSolution = async (contestName) => {
             params: {
                 part: 'snippet',
                 q: searchQuery,
-                key: process.env.YOUTUBE_API_KEY, // Your API key from .env
-                maxResults: 1, // We only need the top result
-                type: 'video'
+                key: process.env.YOUTUBE_API_KEY,
+                maxResults: 1,
+                type: 'video',
+                order: 'date', // NEW: Prioritize the most recent videos
+                publishedAfter: new Date(contestEndTime).toISOString() // NEW: Only find videos published AFTER the contest ended
             }
         });
 
         if (response.data.items && response.data.items.length > 0) {
             const videoId = response.data.items[0].id.videoId;
-            console.log(`Found videoId: ${videoId} for "${contestName}"`);
+            console.log(`Found relevant videoId: ${videoId} for "${contestName}"`);
             return videoId;
         } else {
-            console.log(`No solution found on YouTube for "${contestName}" yet.`);
+            console.log(`No solution uploaded after the contest ended for "${contestName}" yet.`);
             return null;
         }
     } catch (error) {
-        // It's important to log the actual error message from the API
         console.error('Error fetching from YouTube API:', error.response ? error.response.data.error.message : error.message);
         return null;
     }
@@ -262,10 +260,9 @@ const findYouTubeSolution = async (contestName) => {
 const updatePastContests = async () => {
     console.log('Running scheduled job: Checking for past contests...');
     try {
-        // Find contests that ended, are still marked 'Upcoming', and don't have a solution
         const contestsToUpdate = await Contest.find({
-            endTime: { $lt: new Date() }, // Contest end time is in the past
-            solutionUrl: null             // We haven't found a solution for it yet
+            endTime: { $lt: new Date() },
+            solutionUrl: null 
         });
 
         if (contestsToUpdate.length === 0) {
@@ -276,17 +273,18 @@ const updatePastContests = async () => {
         console.log(`Found ${contestsToUpdate.length} contests to check for solutions.`);
 
         for (const contest of contestsToUpdate) {
-            const videoId = await findYouTubeSolution(contest.name);
+            // UPDATED: Pass the contest's end time to the search function
+            const videoId = await findYouTubeSolution(contest.name, contest.endTime);
 
             if (videoId) {
-                // If a solution is found, update status and save the videoId
                 await Contest.findByIdAndUpdate(contest._id, {
                     status: 'Past',
                     solutionUrl: videoId
                 });
                 console.log(`Updated "${contest.name}" with solution.`);
             } else {
-                 // If no solution is found, just update the status to 'Past'
+                // If no solution is found yet, just update the status to 'Past'
+                // The job will re-check for a solution on its next run
                 await Contest.findByIdAndUpdate(contest._id, { status: 'Past' });
                 console.log(`Marked "${contest.name}" as 'Past' (no solution yet).`);
             }
