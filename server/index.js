@@ -23,13 +23,17 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 
 // --- Session Configuration ---
+// NEW production-ready session config
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    proxy: true, // Required for Render/Heroku environments
     cookie: {
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-        secure: process.env.NODE_ENV === 'production'
+        secure: true, // Required for cross-site cookies
+        httpOnly: true,
+        sameSite: 'none', // Allow cross-site cookies
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
 
