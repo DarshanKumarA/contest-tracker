@@ -257,40 +257,49 @@ const findYouTubeSolution = async (contestName, contestEndTime) => {
 
 
 // This function finds contests that have ended and searches for their solutions
-const updatePastContests = async () => {
-    console.log('Running scheduled job: Checking for past contests...');
-    try {
-        const contestsToUpdate = await Contest.find({
-            endTime: { $lt: new Date() },
-            solutionUrl: null 
-        });
+const updateContestStatuses = async () => {
+    console.log('Running scheduled job: Updating contest statuses...');
+    const now = new Date();
 
-        if (contestsToUpdate.length === 0) {
-            console.log('No new past contests to update.');
+    try {
+        // Find all contests that are not yet marked as 'Past'
+        const contestsToCheck = await Contest.find({ status: { $ne: 'Past' } });
+
+        if (contestsToCheck.length === 0) {
+            console.log('No contests to update.');
             return;
         }
-        
-        console.log(`Found ${contestsToUpdate.length} contests to check for solutions.`);
 
-        for (const contest of contestsToUpdate) {
-            // UPDATED: Pass the contest's end time to the search function
-            const videoId = await findYouTubeSolution(contest.name, contest.endTime);
+        for (const contest of contestsToCheck) {
+            let newStatus = contest.status;
 
-            if (videoId) {
-                await Contest.findByIdAndUpdate(contest._id, {
-                    status: 'Past',
-                    solutionUrl: videoId
-                });
-                console.log(`Updated "${contest.name}" with solution.`);
+            if (now >= contest.endTime) {
+                newStatus = 'Past';
+            } else if (now >= contest.startTime && now < contest.endTime) {
+                newStatus = 'On-going';
             } else {
-                // If no solution is found yet, just update the status to 'Past'
-                // The job will re-check for a solution on its next run
-                await Contest.findByIdAndUpdate(contest._id, { status: 'Past' });
-                console.log(`Marked "${contest.name}" as 'Past' (no solution yet).`);
+                newStatus = 'Upcoming';
+            }
+
+            // If the status has changed, update it in the database
+            if (newStatus !== contest.status) {
+                contest.status = newStatus;
+                await contest.save();
+                console.log(`Updated status for "${contest.name}" to ${newStatus}.`);
+            }
+            
+            // If a contest is now 'Past' and has no solution, search for one
+            if (newStatus === 'Past' && !contest.solutionUrl) {
+                const videoId = await findYouTubeSolution(contest.name, contest.endTime);
+                if (videoId) {
+                    contest.solutionUrl = videoId;
+                    await contest.save();
+                    console.log(`Found and saved solution for "${contest.name}".`);
+                }
             }
         }
     } catch (error) {
-        console.error('Error in updatePastContests job:', error);
+        console.error('Error in updateContestStatuses job:', error);
     }
 };
 
@@ -415,18 +424,21 @@ app.post('/api/calendar-event', async (req, res) => {
 });
 
 // --- Database Connection and Server Start ---
+// --- Database Connection and Server Start ---
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('Successfully connected to MongoDB Atlas!');
     app.listen(PORT, () => {
       console.log(`Server is running on http://localhost:${PORT}`);
       fetchAndStoreContests();
-      updatePastContests();
+      updateContestStatuses(); // Run once on start
       schedule.scheduleJob('0 * * * *', fetchAndStoreContests);
-      schedule.scheduleJob('*/5 * * * *', updatePastContests);
+      // UPDATED: Call the new function every 5 minutes
+      schedule.scheduleJob('*/5 * * * *', updateContestStatuses);
       console.log('Scheduled jobs for fetching and updating contests.');
     });
   })
+  //...
   .catch((error) => {
     console.error('Error connecting to MongoDB Atlas:', error.message);
     process.exit(1);
