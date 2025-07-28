@@ -1,20 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-// NEW: Added Search icon
 import { Calendar, Bookmark, ExternalLink, Sun, Moon, Trophy, List, LoaderCircle, ChevronDown, CheckCircle, XCircle, Heart, Youtube, LogIn, LogOut, Search } from 'lucide-react';
 
-// --- Define the live server URL ---
+// Use the environment variable for the API base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
 
 // --- Components ---
 
-// Notification Component (No Changes)
+// Notification Component: Displays success or error messages
 const Notification = ({ message, type, onDismiss }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             onDismiss();
         }, 2000);
-
         return () => clearTimeout(timer);
     }, [onDismiss]);
 
@@ -29,24 +26,18 @@ const Notification = ({ message, type, onDismiss }) => {
     );
 };
 
-// NEW: AddToCalendarButton Component
-// In App.jsx, replace the AddToCalendarButton component
-
+// AddToCalendarButton Component: Handles adding events to Google Calendar
 const AddToCalendarButton = ({ contest }) => {
     const [isAdding, setIsAdding] = useState(false);
 
     const handleCalendarClick = async () => {
         setIsAdding(true);
-
         try {
             const response = await fetch(`${API_BASE_URL}/api/calendar-event`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                // Send the whole contest object to the backend
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contest }), 
-                credentials: 'include', // Important: sends the session cookie
+                credentials: 'include', // Sends session cookie for authentication
             });
 
             if (!response.ok) {
@@ -54,12 +45,10 @@ const AddToCalendarButton = ({ contest }) => {
             }
 
             const result = await response.json();
-            // You could show a success notification here!
             alert(result.message); 
 
         } catch (error) {
             console.error('Error adding to calendar:', error);
-            // You could show an error notification here!
             alert('Could not add event to calendar.');
         } finally {
             setIsAdding(false);
@@ -78,15 +67,10 @@ const AddToCalendarButton = ({ contest }) => {
     );
 };
 
-// Header Component (No Changes)
+// Header Component: Main navigation and controls
 const Header = ({ theme, setTheme, isScrolled, setPage, page, user }) => {
-    const login = () => {
-        window.location.href = `${API_BASE_URL}/auth/google`;
-    };
-
-    const logout = () => {
-        window.location.href = `${API_BASE_URL}/auth/logout`;
-    };
+    const login = () => { window.location.href = `${API_BASE_URL}/auth/google`; };
+    const logout = () => { window.location.href = `${API_BASE_URL}/auth/logout`; };
 
     return (
       <header className={`sticky top-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white/60 dark:bg-[#121212]/60 backdrop-blur-2xl border-b border-gray-300/20 dark:border-gray-800/50' : 'bg-white dark:bg-[#121212]'}`}>
@@ -106,14 +90,10 @@ const Header = ({ theme, setTheme, isScrolled, setPage, page, user }) => {
                     {user ? (
                         <>
                             <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-300">Welcome, {user.displayName.split(' ')[0]}</span>
-                            <button onClick={logout} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300" title="Logout">
-                                <LogOut size={18} />
-                            </button>
+                            <button onClick={logout} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300" title="Logout"><LogOut size={18} /></button>
                         </>
                     ) : (
-                        <button onClick={login} className="hidden sm:flex items-center gap-2 text-sm bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium">
-                            <LogIn size={16} /> Login with Google
-                        </button>
+                        <button onClick={login} className="hidden sm:flex items-center gap-2 text-sm bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-medium"><LogIn size={16} /> Login with Google</button>
                     )}
                     <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
                         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -125,8 +105,7 @@ const Header = ({ theme, setTheme, isScrolled, setPage, page, user }) => {
     );
 };
 
-// Contest Card Component
-// NEW: Added AddToCalendarButton
+// ContestCard Component: Displays individual contest information
 const ContestCard = ({ contest, onSave, user }) => {
   const platformColorMap = {
     'Codeforces': 'bg-rose-500', 'LeetCode': 'bg-amber-500', 'HackerEarth': 'bg-blue-500', 'TopCoder': 'bg-indigo-500',
@@ -147,73 +126,40 @@ const ContestCard = ({ contest, onSave, user }) => {
       </div>
       <div className="flex justify-between items-center mt-auto">
         <div className="flex items-center gap-4 flex-wrap">
-            {contest.status === 'Past' && contest.solutionUrl && (
-                <a href={`https://www.youtube.com/watch?v=${contest.solutionUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 font-medium">
-                    <Youtube size={16} /> Solution
-                </a>
-            )}
-            {/* NEW: Show calendar button for upcoming contests */}
+            {contest.status === 'Past' && contest.solutionUrl && (<a href={`https://www.youtube.com/watch?v=${contest.solutionUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 font-medium"><Youtube size={16} /> Solution</a>)}
             {contest.status === 'Upcoming' && <AddToCalendarButton contest={contest} />}
-            <a href={contest.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium">
-                <ExternalLink size={16} /> Visit
-            </a>
+            <a href={contest.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium"><ExternalLink size={16} /> Visit</a>
         </div>
-        {user && (
-            <button 
-              onClick={() => onSave(contest._id, !contest.saved)}
-              className={`flex items-center gap-2 text-sm px-4 py-2 rounded-md transition-colors font-semibold ${
-                contest.saved 
-                  ? 'bg-gray-900 dark:bg-white text-white dark:text-black' 
-                  : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
-              }`}
-            >
-              <Bookmark size={16} /> {contest.saved ? 'Saved' : 'Save'}
-            </button>
-        )}
+        {user && (<button onClick={() => onSave(contest._id, !contest.saved)} className={`flex items-center gap-2 text-sm px-4 py-2 rounded-md transition-colors font-semibold ${ contest.saved ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'}`}><Bookmark size={16} /> {contest.saved ? 'Saved' : 'Save'}</button>)}
       </div>
     </div>
   );
 };
 
-// Custom Select Dropdown Component (No Changes)
+// CustomSelect Component: Dropdown for platform filtering
 const CustomSelect = ({ options, selected, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const selectRef = useRef(null);
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (selectRef.current && !selectRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
+        const handleClickOutside = (event) => { if (selectRef.current && !selectRef.current.contains(event.target)) { setIsOpen(false); } };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const handleSelect = (option) => {
-        onChange(option);
-        setIsOpen(false);
-    };
-
+    const handleSelect = (option) => { onChange(option); setIsOpen(false); };
     const selectedOption = options.find(opt => opt.value === selected);
 
     return (
         <div className="relative w-full sm:w-48" ref={selectRef}>
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white text-sm rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 text-left flex justify-between items-center"
-            >
+            <button onClick={() => setIsOpen(!isOpen)} className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white text-sm rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 block w-full p-2.5 text-left flex justify-between items-center">
                 <span className={selectedOption?.color || ''}>{selectedOption?.label}</span>
                 <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
             {isOpen && (
                 <div className="absolute z-10 mt-1 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
                     {options.map(option => (
-                        <div
-                            key={option.value}
-                            onClick={() => handleSelect(option)}
-                            className={`p-2.5 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 ${option.color || ''}`}
-                        >
+                        <div key={option.value} onClick={() => handleSelect(option)} className={`p-2.5 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 ${option.color || ''}`}>
                             {option.label}
                         </div>
                     ))}
@@ -223,29 +169,23 @@ const CustomSelect = ({ options, selected, onChange }) => {
     );
 };
 
-// Footer Component (No Changes)
+// Footer Component: Site footer
 const Footer = () => (
     <footer className="w-full py-6 mt-10 border-t border-gray-200 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            <p className="flex items-center justify-center gap-1.5">
-                Contest Tracker © 2025 | Made with <Heart size={14} className="text-red-500" /> by Darshan
-            </p>
+            <p className="flex items-center justify-center gap-1.5">Contest Tracker © 2025 | Made with <Heart size={14} className="text-red-500" /> by Darshan</p>
         </div>
     </footer>
 );
 
-
-// Main App Component
+// Main App Component: The root of the application
 export default function App() {
   const [theme, setTheme] = useState('dark');
   const [page, setPage] = useState('home');
-  const [activeTab, setActiveTab] = useState('Upcoming');
+  const [activeTab, setActiveTab] = useState('Upcoming'); // Default tab set to 'Upcoming'
   const [selectedPlatform, setSelectedPlatform] = useState('All Platforms');
   const [isScrolled, setIsScrolled] = useState(false);
-  
-  // NEW: State for the search query
   const [searchQuery, setSearchQuery] = useState('');
-  
   const [allContests, setAllContests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -260,32 +200,32 @@ export default function App() {
     { value: 'TopCoder', label: 'TopCoder', color: 'text-indigo-500' }
   ];
 
+  // Effect for theme switching
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (theme === 'dark') { document.documentElement.classList.add('dark'); } 
+    else { document.documentElement.classList.remove('dark'); }
   }, [theme]);
 
+  // Effect for header styling on scroll
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Effect to fetch initial data (user and contests)
   useEffect(() => {
     const fetchData = async () => {
         setIsLoading(true);
+        setError(null);
         try {
             const userRes = await fetch(`${API_BASE_URL}/api/user`, { credentials: 'include' });
             if (userRes.ok) {
                 const userData = await userRes.json();
                 setUser(userData);
             }
-
             const contestsRes = await fetch(`${API_BASE_URL}/api/contests`, { credentials: 'include' });
-            if (!contestsRes.ok) throw new Error('Network response was not ok');
+            if (!contestsRes.ok) throw new Error('Failed to fetch');
             const contestData = await contestsRes.json();
             setAllContests(contestData);
         } catch (err) {
@@ -297,26 +237,16 @@ export default function App() {
     fetchData();
   }, []);
 
-  const showNotification = (message, type = 'success') => {
-      setNotification({ message, type });
-  };
-
+  // Helper function to show notifications
+  const showNotification = (message, type = 'success') => { setNotification({ message, type }); };
+  
+  // Helper function to handle saving/unsaving contests
   const handleToggleSave = async (contestId, newSavedStatus) => {
-    if (!user) {
-        showNotification('Please log in to save contests.', 'error');
-        return;
-    }
+    if (!user) { showNotification('Please log in to save contests.', 'error'); return; }
     const originalContests = [...allContests];
     try {
-        setAllContests(allContests.map(c => 
-            c._id === contestId ? { ...c, saved: newSavedStatus } : c
-        ));
-        
-        showNotification(
-            newSavedStatus ? 'Contest saved!' : 'Removed from bookmarks.',
-            'success'
-        );
-
+        setAllContests(allContests.map(c => c._id === contestId ? { ...c, saved: newSavedStatus } : c));
+        showNotification(newSavedStatus ? 'Contest saved!' : 'Removed from bookmarks.', 'success');
         await fetch(`${API_BASE_URL}/api/contests/${contestId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -329,38 +259,40 @@ export default function App() {
         showNotification('Failed to update bookmark.', 'error');
     }
   };
-
-  // NEW: Updated filtering logic to include search
+  
+  // Memoized function to filter contests based on current state
   const filteredContests = useMemo(() => {
     let contests = allContests;
-
+    
+    // Filter by page (bookmarks, today)
     if (page === 'bookmarks') {
-        contests = contests.filter(c => c.saved);
+      contests = contests.filter(c => c.saved);
     } else if (page === 'today') {
-        const today = new Date();
-        contests = contests.filter(c => {
-            const contestDate = new Date(c.startTime);
-            return contestDate.getDate() === today.getDate() &&
-                   contestDate.getMonth() === today.getMonth() &&
-                   contestDate.getFullYear() === today.getFullYear();
-        });
+      const today = new Date();
+      contests = allContests.filter(c => {
+        const contestDate = new Date(c.startTime);
+        return contestDate.getDate() === today.getDate() &&
+               contestDate.getMonth() === today.getMonth() &&
+               contestDate.getFullYear() === today.getFullYear();
+      });
     }
     
-    // Apply search filter
+    // Filter by search query
     if (searchQuery) {
         contests = contests.filter(contest => 
             contest.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }
 
-    // Apply status and platform filters
+    // Final filter by status and platform for the home page
     return contests.filter(contest => {
       const statusMatch = (page === 'today' || page === 'bookmarks') ? true : contest.status === activeTab;
       const platformMatch = selectedPlatform === 'All Platforms' || contest.platform === selectedPlatform;
       return statusMatch && platformMatch;
     });
-  }, [page, activeTab, selectedPlatform, allContests, searchQuery]); // Added searchQuery dependency
+  }, [page, activeTab, selectedPlatform, allContests, searchQuery]);
 
+  // Helper function to get the correct page title
   const getPageTitle = () => {
     if (page === 'bookmarks') return 'My Bookmarks';
     if (page === 'today') return "Today's Contests";
@@ -371,75 +303,37 @@ export default function App() {
     <div className="flex flex-col min-h-screen bg-white dark:bg-[#121212] text-gray-800 dark:text-gray-200 font-sans">
       {notification && <Notification message={notification.message} type={notification.type} onDismiss={() => setNotification(null)} />}
       <Header theme={theme} setTheme={setTheme} isScrolled={isScrolled} setPage={setPage} page={page} user={user} />
-      
       <main className="flex-grow p-4 sm:p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-              {getPageTitle()}
-            </h2>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">{getPageTitle()}</h2>
             <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-2xl mx-auto">
-              {
-                page === 'bookmarks' ? 'Your saved contests for quick access.' :
-                page === 'today' ? 'All coding challenges scheduled for today.' :
-                'Stay updated with upcoming and past coding contests from popular platforms'
-              }
+              { page === 'bookmarks' ? 'Your saved contests for quick access.' : page === 'today' ? 'All coding challenges scheduled for today.' : 'Stay updated with upcoming and past coding contests from popular platforms' }
             </p>
           </div>
-
-          {/* NEW: Filter and Search Bar section */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
             {page === 'home' ? (
                 <div className="flex bg-gray-100 dark:bg-[#1e1e1e] p-1 rounded-lg">
-                    <button onClick={() => setActiveTab('Upcoming')} className={`px-4 py-1.5 text-sm rounded-md font-medium ${activeTab === 'Upcoming' ? 'bg-white dark:bg-gray-600' : 'text-gray-500'}`}>Upcoming</button>
-                    <button onClick={() => setActiveTab('Past')} className={`px-4 py-1.5 text-sm rounded-md font-medium ${activeTab === 'Past' ? 'bg-white dark:bg-gray-600' : 'text-gray-500'}`}>Past</button>
+                    <button onClick={() => setActiveTab('Upcoming')} className={`px-4 py-1.5 text-sm rounded-md font-medium ${activeTab === 'Upcoming' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Upcoming</button>
+                    <button onClick={() => setActiveTab('On-going')} className={`px-4 py-1.5 text-sm rounded-md font-medium ${activeTab === 'On-going' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>On-going</button>
+                    <button onClick={() => setActiveTab('Past')} className={`px-4 py-1.5 text-sm rounded-md font-medium ${activeTab === 'Past' ? 'bg-white dark:bg-gray-600 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Past</button>
                 </div>
-            ) : <div />} {/* Placeholder for alignment */}
-            
+            ) : <div />}
             <div className="relative w-full sm:w-auto flex-grow sm:flex-grow-0 flex items-center gap-4">
                 <div className="relative w-full">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                        <Search size={16} className="text-gray-400" />
-                    </div>
-                    <input 
-                        type="text"
-                        placeholder="Search contests..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white text-sm rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 block w-full pl-10 p-2.5"
-                    />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><Search size={16} className="text-gray-400" /></div>
+                    <input type="text" placeholder="Search contests..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white text-sm rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 block w-full pl-10 p-2.5"/>
                 </div>
-                {/* Hide platform filter on Today and Bookmarks pages */}
-                {page === 'home' && (
-                    <CustomSelect
-                      options={platformOptions}
-                      selected={selectedPlatform}
-                      onChange={(option) => setSelectedPlatform(option.value)}
-                    />
-                )}
+                {page === 'home' && (<CustomSelect options={platformOptions} selected={selectedPlatform} onChange={(option) => setSelectedPlatform(option.value)}/>)}
             </div>
           </div>
-
-          {isLoading ? (
-            <div className="flex justify-center items-center py-20"><LoaderCircle className="animate-spin text-purple-500" size={48} /></div>
-          ) : error ? (
-            <p className="text-red-500 text-center py-10">Error: {error}</p>
-          ) : (
+          {isLoading ? ( <div className="flex justify-center items-center py-20"><LoaderCircle className="animate-spin text-purple-500" size={48} /></div> ) 
+          : error ? ( <p className="text-red-500 text-center py-10">Error: {error}</p> ) 
+          : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContests.length > 0 ? (
-                filteredContests.map((contest) => (
-                  <ContestCard 
-                    key={contest._id} 
-                    contest={contest} 
-                    onSave={handleToggleSave}
-                    user={user}
-                  />
-                ))
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400 col-span-full text-center py-10">
-                  No contests found for the selected filters.
-                </p>
-              )}
+                filteredContests.map((contest) => (<ContestCard key={contest._id} contest={contest} onSave={handleToggleSave} user={user}/>))
+              ) : ( <p className="text-gray-500 dark:text-gray-400 col-span-full text-center py-10">No contests found for the selected filters.</p> )}
             </div>
           )}
         </div>
