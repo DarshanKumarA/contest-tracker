@@ -200,29 +200,49 @@ const fetchAndStoreContests = async () => {
     }
 };
 
-// UPDATED: Now accepts platform to allow for targeted searches
+// NEW: Helper function to extract key terms from a contest name for a better search
+const extractSearchKeywords = (contestName, platform) => {
+    // For LeetCode, just use the contest name as is, but remove "Biweekly" for broader matches
+    if (platform === 'LeetCode') {
+        return contestName.replace('Biweekly ', '');
+    }
+
+    // For Codeforces, extract the round number and division
+    if (platform === 'Codeforces') {
+        const match = contestName.match(/Codeforces Round.*?(\d+).*?(Div\.\s*\d+)?/);
+        if (match) {
+            // e.g., "Codeforces 1039 Div. 2"
+            return `Codeforces ${match[1]} ${match[2] || ''}`.trim();
+        }
+    }
+    
+    // For all other platforms, use the original name but add "solution"
+    return `"${contestName}" solution`;
+};
+
+
+// UPDATED: This function now uses the new keyword extractor for a more flexible search
 const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
-    const searchQuery = `"${contestName}" solution editorial`;
+    // Use the new helper function to create a smarter search query
+    const searchQuery = extractSearchKeywords(contestName, platform);
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
     const TLE_ELIMINATORS_CHANNEL_ID = 'UCfaJ6P3Q60-wGzE0sS1j_ew';
 
-    // Base parameters for the YouTube API search
     const params = {
         part: 'snippet',
         q: searchQuery,
         key: process.env.YOUTUBE_API_KEY,
         maxResults: 1,
         type: 'video',
-        order: 'date',
+        order: 'relevance', // Change order to 'relevance' for broader keyword searches
         publishedAfter: new Date(contestEndTime).toISOString()
     };
 
-    // If the contest is from Codeforces or LeetCode, search a specific channel
     if (platform === 'Codeforces' || platform === 'LeetCode') {
         params.channelId = TLE_ELIMINATORS_CHANNEL_ID;
-        console.log(`Searching within TLE_Eliminators channel for ${platform} contest: ${contestName}`);
+        console.log(`Searching TLE_Eliminators for: "${searchQuery}"`);
     } else {
-        console.log(`Searching all of YouTube for: ${searchQuery}`);
+        console.log(`Searching YouTube for: "${searchQuery}"`);
     }
 
     try {
@@ -265,7 +285,6 @@ const updateContestStatuses = async () => {
                 console.log(`Updated status for "${contest.name}" to ${newStatus}.`);
             }
             if (newStatus === 'Past' && !contest.solutionUrl) {
-                // UPDATED: Pass the platform to the search function
                 const videoId = await findYouTubeSolution(contest.name, contest.endTime, contest.platform);
                 if (videoId) {
                     contest.solutionUrl = videoId;
@@ -282,20 +301,16 @@ const updateContestStatuses = async () => {
 const backfillMissingSolutions = async () => {
     console.log('Running one-time job: Backfilling missing YouTube solutions...');
     try {
-        // Find all past Codeforces & LeetCode contests that are missing a solution link
         const contestsToBackfill = await Contest.find({
             platform: { $in: ['Codeforces', 'LeetCode'] },
             status: 'Past',
             solutionUrl: null 
         });
-
         if (contestsToBackfill.length === 0) {
             console.log('No past contests are missing solutions. All good!');
             return;
         }
-        
         console.log(`Found ${contestsToBackfill.length} past contests to check for solutions.`);
-
         for (const contest of contestsToBackfill) {
             const videoId = await findYouTubeSolution(contest.name, contest.endTime, contest.platform);
             if (videoId) {
