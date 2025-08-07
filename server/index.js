@@ -279,6 +279,37 @@ const updateContestStatuses = async () => {
     }
 };
 
+const backfillMissingSolutions = async () => {
+    console.log('Running one-time job: Backfilling missing YouTube solutions...');
+    try {
+        // Find all past Codeforces & LeetCode contests that are missing a solution link
+        const contestsToBackfill = await Contest.find({
+            platform: { $in: ['Codeforces', 'LeetCode'] },
+            status: 'Past',
+            solutionUrl: null 
+        });
+
+        if (contestsToBackfill.length === 0) {
+            console.log('No past contests are missing solutions. All good!');
+            return;
+        }
+        
+        console.log(`Found ${contestsToBackfill.length} past contests to check for solutions.`);
+
+        for (const contest of contestsToBackfill) {
+            const videoId = await findYouTubeSolution(contest.name, contest.endTime, contest.platform);
+            if (videoId) {
+                contest.solutionUrl = videoId;
+                await contest.save();
+                console.log(`Backfilled solution for: "${contest.name}"`);
+            }
+        }
+        console.log('Finished backfilling solutions.');
+    } catch (error) {
+        console.error('Error during solution backfill:', error);
+    }
+};
+
 // --- Authentication Routes ---
 app.get('/auth/google', passport.authenticate('google', { 
     scope: ['profile', 'https://www.googleapis.com/auth/calendar.events'],
@@ -388,6 +419,7 @@ mongoose.connect(process.env.MONGO_URI)
       console.log(`Server is running on http://localhost:${PORT}`);
       fetchAndStoreContests();
       updateContestStatuses();
+      backfillMissingSolutions();
       schedule.scheduleJob('0 * * * *', fetchAndStoreContests);
       schedule.scheduleJob('*/5 * * * *', updateContestStatuses);
       console.log('Scheduled jobs for fetching and updating contests.');
