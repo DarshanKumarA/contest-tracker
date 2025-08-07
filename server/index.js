@@ -160,7 +160,6 @@ const fetchAndStoreContests = async () => {
         if (cfResponse.data.status === 'OK') {
             const cfContests = cfResponse.data.result.filter(c => c.phase === 'BEFORE').map(c => ({ name: c.name, platform: 'Codeforces', duration: formatDuration(c.durationSeconds), startTime: new Date(c.startTimeSeconds * 1000), endTime: new Date(c.startTimeSeconds * 1000 + c.durationSeconds * 1000), status: 'Upcoming', url: `https://codeforces.com/contests/${c.id}` }));
             allUpcomingContests.push(...cfContests);
-            console.log(`Fetched ${cfContests.length} from Codeforces.`);
         }
     } catch (e) { console.error('Failed to fetch from Codeforces:', e.message); }
 
@@ -169,7 +168,6 @@ const fetchAndStoreContests = async () => {
         if (lcResponse.data.data.upcomingContests) {
             const lcContests = lcResponse.data.data.upcomingContests.map(c => ({ name: c.title, platform: 'LeetCode', duration: formatDuration(c.duration), startTime: new Date(c.startTime * 1000), endTime: new Date(c.startTime * 1000 + c.duration * 1000), status: 'Upcoming', url: `https://leetcode.com/contest/${c.titleSlug}` }));
             allUpcomingContests.push(...lcContests);
-            console.log(`Fetched ${lcContests.length} from LeetCode.`);
         }
     } catch (e) { console.error('Failed to fetch from LeetCode:', e.message); }
 
@@ -178,7 +176,6 @@ const fetchAndStoreContests = async () => {
         if (heResponse.data.response) {
             const heContests = heResponse.data.response.filter(c => c.status === 'UPCOMING').map(c => ({ name: c.title, platform: 'HackerEarth', duration: formatDuration((new Date(c.end_utc_tz) - new Date(c.start_utc_tz)) / 1000), startTime: new Date(c.start_utc_tz), endTime: new Date(c.end_utc_tz), status: 'Upcoming', url: c.url }));
             allUpcomingContests.push(...heContests);
-            console.log(`Fetched ${heContests.length} from HackerEarth.`);
         }
     } catch (e) { console.error('Failed to fetch from HackerEarth:', e.message); }
 
@@ -187,12 +184,10 @@ const fetchAndStoreContests = async () => {
         if (tcResponse.data) {
             const tcContests = tcResponse.data.filter(c => new Date(c.startDate) > new Date()).map(c => ({ name: c.name, platform: 'TopCoder', duration: formatDuration((new Date(c.endDate) - new Date(c.startDate)) / 1000), startTime: new Date(c.startDate), endTime: new Date(c.endDate), status: 'Upcoming', url: `https://www.topcoder.com/challenges/${c.id}` }));
             allUpcomingContests.push(...tcContests);
-            console.log(`Fetched ${tcContests.length} from TopCoder.`);
         }
     } catch (e) { console.error('Failed to fetch from TopCoder:', e.message); }
 
     if (allUpcomingContests.length > 0) {
-        // BUG FIX: The filter now uses both name and startTime to uniquely identify a contest, preventing duplicates.
         const bulkOps = allUpcomingContests.map(c => ({
             updateOne: {
                 filter: { name: c.name, startTime: c.startTime },
@@ -205,28 +200,40 @@ const fetchAndStoreContests = async () => {
     }
 };
 
-const findYouTubeSolution = async (contestName, contestEndTime) => {
+// UPDATED: Now accepts platform to allow for targeted searches
+const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
     const searchQuery = `"${contestName}" solution editorial`;
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
-    console.log(`Searching YouTube for: ${searchQuery}`);
+    const TLE_ELIMINATORS_CHANNEL_ID = 'UCfaJ6P3Q60-wGzE0sS1j_ew';
+
+    // Base parameters for the YouTube API search
+    const params = {
+        part: 'snippet',
+        q: searchQuery,
+        key: process.env.YOUTUBE_API_KEY,
+        maxResults: 1,
+        type: 'video',
+        order: 'date',
+        publishedAfter: new Date(contestEndTime).toISOString()
+    };
+
+    // If the contest is from Codeforces or LeetCode, search a specific channel
+    if (platform === 'Codeforces' || platform === 'LeetCode') {
+        params.channelId = TLE_ELIMINATORS_CHANNEL_ID;
+        console.log(`Searching within TLE_Eliminators channel for ${platform} contest: ${contestName}`);
+    } else {
+        console.log(`Searching all of YouTube for: ${searchQuery}`);
+    }
+
     try {
-        const response = await axios.get(YOUTUBE_API_URL, {
-            params: {
-                part: 'snippet',
-                q: searchQuery,
-                key: process.env.YOUTUBE_API_KEY,
-                maxResults: 1,
-                type: 'video',
-                order: 'date',
-                publishedAfter: new Date(contestEndTime).toISOString()
-            }
-        });
+        const response = await axios.get(YOUTUBE_API_URL, { params });
+
         if (response.data.items && response.data.items.length > 0) {
             const videoId = response.data.items[0].id.videoId;
             console.log(`Found relevant videoId: ${videoId} for "${contestName}"`);
             return videoId;
         } else {
-            console.log(`No solution uploaded after the contest ended for "${contestName}" yet.`);
+            console.log(`No solution found for "${contestName}" yet.`);
             return null;
         }
     } catch (error) {
@@ -241,7 +248,6 @@ const updateContestStatuses = async () => {
     try {
         const contestsToCheck = await Contest.find({ status: { $ne: 'Past' } });
         if (contestsToCheck.length === 0) {
-            console.log('No contests to update.');
             return;
         }
         for (const contest of contestsToCheck) {
@@ -259,7 +265,8 @@ const updateContestStatuses = async () => {
                 console.log(`Updated status for "${contest.name}" to ${newStatus}.`);
             }
             if (newStatus === 'Past' && !contest.solutionUrl) {
-                const videoId = await findYouTubeSolution(contest.name, contest.endTime);
+                // UPDATED: Pass the platform to the search function
+                const videoId = await findYouTubeSolution(contest.name, contest.endTime, contest.platform);
                 if (videoId) {
                     contest.solutionUrl = videoId;
                     await contest.save();
