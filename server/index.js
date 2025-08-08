@@ -206,7 +206,6 @@ const extractSearchKeywords = (contestName, platform) => {
         return contestName.replace('Biweekly ', '').split(' ');
     }
     if (platform === 'Codeforces') {
-        // UPDATED LOGIC: Now correctly extracts the division number as a keyword
         // Extracts "Codeforces Round #1039 (Div. 2)" -> ["Codeforces", "1039", "Div", "2"]
         const match = contestName.match(/Codeforces Round.*?(\d+).*?(Div\.\s*(\d+))?/);
         if (match) {
@@ -225,23 +224,20 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
     const TLE_ELIMINATORS_CHANNEL_ID = 'UCfaJ6P3Q60-wGzE0sS1j_ew';
 
-    // Base parameters: Get the 10 most recent completed live streams from the channel
     const params = {
         part: 'snippet',
         key: process.env.YOUTUBE_API_KEY,
-        maxResults: 10, // Get a list of recent streams to search through
+        maxResults: 15, // Get a larger list of recent streams to search through
         type: 'video',
-        order: 'date', // Order by date to get the most recent ones
+        order: 'date',
         publishedAfter: new Date(contestEndTime).toISOString(),
         eventType: 'completed'
     };
 
-    // If it's a specific platform, search the target channel
     if (platform === 'Codeforces' || platform === 'LeetCode') {
         params.channelId = TLE_ELIMINATORS_CHANNEL_ID;
         console.log(`Fetching recent streams from TLE_Eliminators to find solution for "${contestName}"`);
     } else {
-        // For other platforms, do a general search
         params.q = `"${contestName}" solution`;
         console.log(`Performing a general YouTube search for: "${params.q}"`);
     }
@@ -249,24 +245,42 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
     try {
         const response = await axios.get(YOUTUBE_API_URL, { params });
 
-        if (response.data.items && response.data.items.length > 0) {
-            // Now, we filter the results in our code
-            const keywords = extractSearchKeywords(contestName, platform);
-            
-            const foundVideo = response.data.items.find(video => {
-                const title = video.snippet.title.toLowerCase();
-                // Check if the video title contains ALL of our keywords
-                return keywords.every(keyword => title.includes(keyword.toLowerCase()));
-            });
+        if (!response.data.items || response.data.items.length === 0) {
+            console.log(`No recent streams found for "${contestName}" yet.`);
+            return null;
+        }
 
-            if (foundVideo) {
-                const videoId = foundVideo.id.videoId;
-                console.log(`SUCCESS: Found matching videoId: ${videoId} for "${contestName}"`);
-                return videoId;
+        // --- Scoring System Logic ---
+        const keywords = extractSearchKeywords(contestName, platform);
+        let bestMatch = { score: 0, videoId: null };
+
+        console.log(`Analyzing ${response.data.items.length} videos with keywords: [${keywords.join(', ')}]`);
+
+        for (const video of response.data.items) {
+            const title = video.snippet.title.toLowerCase();
+            let currentScore = 0;
+
+            // Score each video based on how many keywords its title contains
+            for (const keyword of keywords) {
+                if (title.includes(keyword.toLowerCase())) {
+                    currentScore++;
+                }
+            }
+
+            // If this video has a better score than the previous best, it becomes the new best match
+            if (currentScore > bestMatch.score) {
+                bestMatch = { score: currentScore, videoId: video.id.videoId, title: video.snippet.title };
             }
         }
+
+        // We require a minimum score to avoid false positives (e.g., must match at least 2 keywords)
+        const MINIMUM_SCORE_THRESHOLD = 2;
+        if (bestMatch.score >= MINIMUM_SCORE_THRESHOLD) {
+            console.log(`SUCCESS: Best match found with score ${bestMatch.score}: "${bestMatch.title}" (ID: ${bestMatch.videoId})`);
+            return bestMatch.videoId;
+        }
         
-        console.log(`No matching solution video found for "${contestName}" yet.`);
+        console.log(`No video met the minimum score threshold of ${MINIMUM_SCORE_THRESHOLD}. No definitive solution found for "${contestName}".`);
         return null;
 
     } catch (error) {
