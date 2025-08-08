@@ -206,10 +206,15 @@ const extractSearchKeywords = (contestName, platform) => {
         return contestName.replace('Biweekly ', '').split(' ');
     }
     if (platform === 'Codeforces') {
-        // Extracts "Codeforces Round #1039 (Div. 2)" -> ["Codeforces", "1039"]
-        const match = contestName.match(/Codeforces Round.*?(\d+)/);
+        // UPDATED LOGIC: Now correctly extracts the division number as a keyword
+        // Extracts "Codeforces Round #1039 (Div. 2)" -> ["Codeforces", "1039", "Div", "2"]
+        const match = contestName.match(/Codeforces Round.*?(\d+).*?(Div\.\s*(\d+))?/);
         if (match) {
-            return ['Codeforces', match[1]];
+            const keywords = ['Codeforces', match[1]];
+            if (match[3]) {
+                keywords.push('Div', match[3]);
+            }
+            return keywords;
         }
     }
     // Fallback for other platforms
