@@ -200,30 +200,20 @@ const fetchAndStoreContests = async () => {
     }
 };
 
-// NEW: Helper function to extract key terms from a contest name for a better search
 const extractSearchKeywords = (contestName, platform) => {
-    // For LeetCode, just use the contest name as is, but remove "Biweekly" for broader matches
     if (platform === 'LeetCode') {
         return contestName.replace('Biweekly ', '');
     }
-
-    // For Codeforces, extract the round number and division
     if (platform === 'Codeforces') {
         const match = contestName.match(/Codeforces Round.*?(\d+).*?(Div\.\s*\d+)?/);
         if (match) {
-            // e.g., "Codeforces 1039 Div. 2"
             return `Codeforces ${match[1]} ${match[2] || ''}`.trim();
         }
     }
-    
-    // For all other platforms, use the original name but add "solution"
     return `"${contestName}" solution`;
 };
 
-
-// UPDATED: This function now uses the new keyword extractor for a more flexible search
 const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
-    // Use the new helper function to create a smarter search query
     const searchQuery = extractSearchKeywords(contestName, platform);
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
     const TLE_ELIMINATORS_CHANNEL_ID = 'UCfaJ6P3Q60-wGzE0sS1j_ew';
@@ -234,20 +224,21 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
         key: process.env.YOUTUBE_API_KEY,
         maxResults: 1,
         type: 'video',
-        order: 'relevance', // Change order to 'relevance' for broader keyword searches
-        publishedAfter: new Date(contestEndTime).toISOString()
+        order: 'relevance',
+        publishedAfter: new Date(contestEndTime).toISOString(),
+        // FINAL FIX: Search specifically for completed live streams
+        eventType: 'completed' 
     };
 
     if (platform === 'Codeforces' || platform === 'LeetCode') {
         params.channelId = TLE_ELIMINATORS_CHANNEL_ID;
-        console.log(`Searching TLE_Eliminators for: "${searchQuery}"`);
+        console.log(`Searching TLE_Eliminators for completed streams: "${searchQuery}"`);
     } else {
         console.log(`Searching YouTube for: "${searchQuery}"`);
     }
 
     try {
         const response = await axios.get(YOUTUBE_API_URL, { params });
-
         if (response.data.items && response.data.items.length > 0) {
             const videoId = response.data.items[0].id.videoId;
             console.log(`Found relevant videoId: ${videoId} for "${contestName}"`);
