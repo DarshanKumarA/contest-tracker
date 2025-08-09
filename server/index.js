@@ -224,13 +224,14 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
     const TLE_ELIMINATORS_CHANNEL_ID = 'UCfaJ6P3Q60-wGzE0sS1j_ew';
 
+    // Step 1: Get a broad list of recent completed streams from the channel.
+    // We do NOT use a text query here to ensure we get a good list to analyze.
     const params = {
         part: 'snippet',
         key: process.env.YOUTUBE_API_KEY,
-        maxResults: 15, // Get a larger list of recent streams to search through
+        maxResults: 20, // Get a larger list to be safe
         type: 'video',
-        order: 'date',
-        //publishedAfter: new Date(contestEndTime).toISOString(),
+        order: 'date', // Get the most recent videos first
         eventType: 'completed'
     };
 
@@ -238,6 +239,7 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
         params.channelId = TLE_ELIMINATORS_CHANNEL_ID;
         console.log(`Fetching recent streams from TLE_Eliminators to find solution for "${contestName}"`);
     } else {
+        // For other platforms, we still rely on a general search
         params.q = `"${contestName}" solution`;
         console.log(`Performing a general YouTube search for: "${params.q}"`);
     }
@@ -250,9 +252,9 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
             return null;
         }
 
-        // --- Scoring System Logic ---
+        // Step 2: Analyze the results with our own scoring logic
         const keywords = extractSearchKeywords(contestName, platform);
-        let bestMatch = { score: 0, videoId: null };
+        let bestMatch = { score: 0, video: null };
 
         console.log(`Analyzing ${response.data.items.length} videos with keywords: [${keywords.join(', ')}]`);
 
@@ -260,27 +262,37 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
             const title = video.snippet.title.toLowerCase();
             let currentScore = 0;
 
-            // Score each video based on how many keywords its title contains
             for (const keyword of keywords) {
                 if (title.includes(keyword.toLowerCase())) {
                     currentScore++;
                 }
             }
 
-            // If this video has a better score than the previous best, it becomes the new best match
             if (currentScore > bestMatch.score) {
-                bestMatch = { score: currentScore, videoId: video.id.videoId, title: video.snippet.title };
+                bestMatch = { score: currentScore, video: video };
             }
         }
 
-        // We require a minimum score to avoid false positives (e.g., must match at least 2 keywords)
+        // Step 3: Validate the best match
         const MINIMUM_SCORE_THRESHOLD = 2;
         if (bestMatch.score >= MINIMUM_SCORE_THRESHOLD) {
-            console.log(`SUCCESS: Best match found with score ${bestMatch.score}: "${bestMatch.title}" (ID: ${bestMatch.videoId})`);
-            return bestMatch.videoId;
+            const video = bestMatch.video;
+            const videoPublishDate = new Date(video.snippet.publishedAt);
+            const contestEndDate = new Date(contestEndTime);
+            
+            // Time validation: ensure the video was published within 7 days after the contest ended
+            const timeDifference = videoPublishDate.getTime() - contestEndDate.getTime();
+            const daysDifference = timeDifference / (1000 * 3600 * 24);
+
+            if (daysDifference >= 0 && daysDifference <= 7) {
+                console.log(`SUCCESS: Found valid match: "${video.snippet.title}" (ID: ${video.id.videoId})`);
+                return video.id.videoId;
+            } else {
+                console.log(`Found a potential match ("${video.snippet.title}"), but it was published outside the valid time window.`);
+            }
         }
         
-        console.log(`No video met the minimum score threshold of ${MINIMUM_SCORE_THRESHOLD}. No definitive solution found for "${contestName}".`);
+        console.log(`No video met the minimum score and time requirements for "${contestName}".`);
         return null;
 
     } catch (error) {
