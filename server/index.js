@@ -230,7 +230,7 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
         maxResults: 15, // Get a larger list of recent streams to search through
         type: 'video',
         order: 'date',
-        publishedAfter: new Date(contestEndTime).toISOString(),
+        //publishedAfter: new Date(contestEndTime).toISOString(),
         eventType: 'completed'
     };
 
