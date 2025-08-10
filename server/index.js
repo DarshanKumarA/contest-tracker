@@ -236,7 +236,8 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
 
     if (platform === 'Codeforces' || platform === 'LeetCode') {
         params.channelId = TLE_ELIMINATORS_CHANNEL_ID;
-        console.log(`Fetching recent streams from TLE_Eliminators to find solution for "${contestName}"`);
+        params.q = platform; 
+        console.log(`Fetching recent '${platform}' videos from TLE_Eliminators to find solution for "${contestName}"`);
     } else {
         // For other platforms, we still rely on a general search
         params.q = `"${contestName}" solution`;
