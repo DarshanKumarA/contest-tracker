@@ -6,25 +6,63 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // --- Components ---
 
-// Notification Component: Displays success or error messages
-const Notification = ({ message, type, onDismiss }) => {
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            onDismiss();
-        }, 3000);
-        return () => clearTimeout(timer);
-    }, [onDismiss]);
+// --- NEW & IMPROVED NOTIFICATION SYSTEM ---
 
+// Individual Notification Component
+// Manages its own slide-in/slide-out animation
+const Notification = ({ id, message, type, onDismiss }) => {
+    const [isExiting, setIsExiting] = useState(false);
+
+    useEffect(() => {
+        // Set a timer to automatically dismiss the notification
+        const timer = setTimeout(() => {
+            setIsExiting(true); // Trigger the slide-out animation
+            // Wait for the animation to finish before removing from the DOM
+            setTimeout(() => onDismiss(id), 500); 
+        }, 4000); // Notification stays for 4 seconds
+
+        return () => clearTimeout(timer);
+    }, [id, onDismiss]);
+
+    const handleDismiss = () => {
+        setIsExiting(true);
+        setTimeout(() => onDismiss(id), 500);
+    };
+    
     const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
     const Icon = type === 'success' ? CheckCircle : XCircle;
 
     return (
-        <div className={`fixed top-5 right-5 z-[100] flex items-center gap-3 p-4 rounded-lg text-white shadow-lg animate-fade-in-down ${bgColor}`}>
-            <Icon size={20} />
-            <p className="text-sm font-medium">{message}</p>
+        <div 
+            className={`transform transition-all duration-500 ease-in-out flex items-center w-full max-w-sm p-4 rounded-lg text-white shadow-lg mb-4 ${
+                isExiting ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'
+            } ${bgColor}`}
+            onClick={handleDismiss}
+        >
+            <Icon size={20} className="flex-shrink-0"/>
+            <p className="text-sm font-medium ml-3">{message}</p>
         </div>
     );
 };
+
+// Notification Container
+// Manages the positioning and stacking of all notifications
+const NotificationContainer = ({ notifications, onDismiss }) => {
+    return (
+        <div className="fixed top-20 right-5 z-[100] w-full max-w-sm">
+            {notifications.map(notification => (
+                <Notification 
+                    key={notification.id} 
+                    {...notification}
+                    onDismiss={onDismiss}
+                />
+            ))}
+        </div>
+    );
+};
+
+// --- END NOTIFICATION SYSTEM ---
+
 
 // AddToCalendarButton Component: Handles adding events to Google Calendar
 const AddToCalendarButton = ({ contest, user, showNotification, onAddSuccess, isAdded }) => {
@@ -52,7 +90,6 @@ const AddToCalendarButton = ({ contest, user, showNotification, onAddSuccess, is
             }
             
             showNotification(result.message || 'Event added to calendar!', 'success');
-            // Notify the parent component of the success for an optimistic UI update
             onAddSuccess(contest._id);
 
         } catch (error) {
@@ -66,7 +103,7 @@ const AddToCalendarButton = ({ contest, user, showNotification, onAddSuccess, is
     return (
         <button
             onClick={handleCalendarClick}
-            disabled={isAdding || isAdded} // Disable if adding or already added
+            disabled={isAdding || isAdded}
             className={`flex items-center gap-2 text-sm font-medium disabled:opacity-60 transition-colors ${
                 isAdded 
                 ? 'text-green-600 dark:text-green-400 cursor-default' 
@@ -85,7 +122,7 @@ const Header = ({ theme, setTheme, isScrolled, setPage, page, user }) => {
     const logout = () => { window.location.href = `${API_BASE_URL}/auth/logout`; };
 
     return (
-      <header className={`sticky top-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white/60 dark:bg-[#121212]/60 backdrop-blur-2xl border-b border-gray-300/20 dark:border-gray-800/50' : 'bg-white dark:bg-[#121212]'}`}>
+      <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'bg-white/60 dark:bg-[#121212]/60 backdrop-blur-2xl border-b border-gray-300/20 dark:border-gray-800/50' : 'bg-white dark:bg-[#121212]'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
             <div className="flex justify-between items-center h-16">
                 <div className="flex items-center gap-8">
@@ -201,8 +238,10 @@ export default function App() {
   const [allContests, setAllContests] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [notification, setNotification] = useState(null);
   const [user, setUser] = useState(null);
+  
+  // State is now an array to handle multiple notifications
+  const [notifications, setNotifications] = useState([]);
 
   const platformOptions = [
     { value: 'All Platforms', label: 'All Platforms', color: 'text-gray-800 dark:text-white' },
@@ -233,7 +272,6 @@ export default function App() {
                 const userData = await userRes.json();
                 setUser(userData);
             }
-            // The contests data now includes the `isAddedToCalendar` flag from the backend
             const contestsRes = await fetch(`${API_BASE_URL}/api/contests`, { credentials: 'include' });
             if (!contestsRes.ok) throw new Error('Failed to fetch');
             const contestData = await contestsRes.json();
@@ -247,7 +285,16 @@ export default function App() {
     fetchData();
   }, []);
 
-  const showNotification = (message, type = 'success') => { setNotification({ message, type }); };
+  // Updated function to add a new notification to the array
+  const showNotification = (message, type = 'success') => {
+    const newNotification = { id: Date.now(), message, type };
+    setNotifications(prev => [newNotification, ...prev]); // Add new notifications to the top
+  };
+
+  // Function to remove a notification by its ID
+  const dismissNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
   
   const handleToggleSave = async (contestId, newSavedStatus) => {
     if (!user) { showNotification('Please log in to save contests.', 'error'); return; }
@@ -268,7 +315,6 @@ export default function App() {
     }
   };
 
-  // New handler to optimistically update the UI when a contest is added to the calendar
   const handleContestAddedToCalendar = (contestId) => {
     setAllContests(prevContests => 
         prevContests.map(c => 
@@ -313,7 +359,8 @@ export default function App() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-[#121212] text-gray-800 dark:text-gray-200 font-sans">
-      {notification && <Notification message={notification.message} type={notification.type} onDismiss={() => setNotification(null)} />}
+      {/* Render the new NotificationContainer */}
+      <NotificationContainer notifications={notifications} onDismiss={dismissNotification} />
       <Header theme={theme} setTheme={setTheme} isScrolled={isScrolled} setPage={setPage} page={page} user={user} />
       <main className="flex-grow p-4 sm:p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
