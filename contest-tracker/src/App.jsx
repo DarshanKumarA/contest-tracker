@@ -11,7 +11,7 @@ const Notification = ({ message, type, onDismiss }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             onDismiss();
-        }, 3000); // Increased time to 3 seconds for better readability
+        }, 3000);
         return () => clearTimeout(timer);
     }, [onDismiss]);
 
@@ -52,7 +52,7 @@ const AddToCalendarButton = ({ contest, user, showNotification, onAddSuccess, is
             }
             
             showNotification(result.message || 'Event added to calendar!', 'success');
-            // Notify the parent component of the success
+            // Notify the parent component of the success for an optimistic UI update
             onAddSuccess(contest._id);
 
         } catch (error) {
@@ -203,8 +203,6 @@ export default function App() {
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
   const [user, setUser] = useState(null);
-  // New state to track contests added to the calendar in the current session
-  const [addedToCalendarIds, setAddedToCalendarIds] = useState(new Set());
 
   const platformOptions = [
     { value: 'All Platforms', label: 'All Platforms', color: 'text-gray-800 dark:text-white' },
@@ -235,6 +233,7 @@ export default function App() {
                 const userData = await userRes.json();
                 setUser(userData);
             }
+            // The contests data now includes the `isAddedToCalendar` flag from the backend
             const contestsRes = await fetch(`${API_BASE_URL}/api/contests`, { credentials: 'include' });
             if (!contestsRes.ok) throw new Error('Failed to fetch');
             const contestData = await contestsRes.json();
@@ -269,9 +268,13 @@ export default function App() {
     }
   };
 
-  // New handler to update the set of added calendar events
+  // New handler to optimistically update the UI when a contest is added to the calendar
   const handleContestAddedToCalendar = (contestId) => {
-    setAddedToCalendarIds(prevIds => new Set(prevIds).add(contestId));
+    setAllContests(prevContests => 
+        prevContests.map(c => 
+            c._id === contestId ? { ...c, isAddedToCalendar: true } : c
+        )
+    );
   };
   
   const filteredContests = useMemo(() => {
@@ -349,7 +352,7 @@ export default function App() {
                         user={user} 
                         showNotification={showNotification}
                         onAddToCalendar={handleContestAddedToCalendar}
-                        isAddedToCalendar={addedToCalendarIds.has(contest._id)}
+                        isAddedToCalendar={contest.isAddedToCalendar}
                     />
                 ))
               ) : ( <p className="text-gray-500 dark:text-gray-400 col-span-full text-center py-10">No contests found for the selected filters.</p> )}

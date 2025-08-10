@@ -45,6 +45,8 @@ const userSchema = new mongoose.Schema({
     googleId: String,
     displayName: String,
     savedContests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contest' }],
+    // 1. ADDED a new field to the user schema to track contests added to the calendar
+    addedToCalendar: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Contest' }],
     accessToken: String,
     refreshToken: String,
     tokenExpires: Number
@@ -200,11 +202,10 @@ const fetchAndStoreContests = async () => {
     }
 };
 
-// NEW FUNCTION: To build the precise search query
 const buildSearchQuery = (contestName, platform) => {
     if (platform === 'Codeforces') {
         const roundMatch = contestName.match(/Round.*?(\d+)/);
-        const divMatch = contestName.match(/Div\.?\s*(\d+)/i); // The dot is now optional
+        const divMatch = contestName.match(/Div\.?\s*(\d+)/i);
         
         if (roundMatch) {
             let query = `Codeforces Round ${roundMatch[1]}`;
@@ -220,17 +221,14 @@ const buildSearchQuery = (contestName, platform) => {
         const numberMatch = contestName.match(/(\d+)/);
 
         if (typeMatch && numberMatch) {
-            // Capitalize "Weekly" or "Biweekly" properly
             const contestType = typeMatch[1].charAt(0).toUpperCase() + typeMatch[1].slice(1).toLowerCase();
             return `LeetCode ${contestType} Contest ${numberMatch[1]} solution`;
         }
     }
 
-    // Fallback for other platforms or if regex fails
     return `${contestName} solution`;
 };
 
-// NEW SIMPLIFIED FUNCTION: To find the solution on YouTube
 const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
     const searchQuery = buildSearchQuery(contestName, platform);
@@ -372,10 +370,15 @@ app.get('/api/contests', async (req, res) => {
     try {
         const contests = await Contest.find({}).lean(); 
         const savedContestIds = req.user ? new Set(req.user.savedContests.map(id => id.toString())) : new Set();
+        // 2. ADDED a check for contests added to the user's calendar
+        const addedToCalendarIds = req.user ? new Set(req.user.addedToCalendar.map(id => id.toString())) : new Set();
+        
         const formattedContests = contests
             .map(c => ({
                 ...c,
                 saved: savedContestIds.has(c._id.toString()),
+                // 3. ADDED a flag to send to the frontend
+                isAddedToCalendar: addedToCalendarIds.has(c._id.toString()),
                 displayStartTime: new Date(c.startTime).toLocaleString('en-IN', {
                     weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true, timeZone: 'Asia/Kolkata'
                 })
@@ -432,6 +435,15 @@ app.post('/api/calendar-event', async (req, res) => {
             calendarId: 'primary',
             resource: event,
         });
+
+        // 4. ADDED logic to save the contest ID to the user's profile upon success
+        if (createdEvent.data.htmlLink) {
+            const user = await User.findById(req.user.id);
+            user.addedToCalendar.addToSet(contest._id);
+            await user.save();
+            console.log(`Saved contest ${contest._id} to user ${user.id}'s calendar list.`);
+        }
+
         res.status(200).json({ message: 'Event created successfully!', url: createdEvent.data.htmlLink });
     } catch (error) {
         console.error('Error creating calendar event:', error);
