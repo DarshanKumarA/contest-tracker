@@ -27,11 +27,10 @@ const Notification = ({ message, type, onDismiss }) => {
 };
 
 // AddToCalendarButton Component: Handles adding events to Google Calendar
-const AddToCalendarButton = ({ contest, user, showNotification }) => {
+const AddToCalendarButton = ({ contest, user, showNotification, onAddSuccess, isAdded }) => {
     const [isAdding, setIsAdding] = useState(false);
 
     const handleCalendarClick = async () => {
-        // 1. Check if user is logged in *before* making an API call
         if (!user) {
             showNotification('Please log in to use this feature.', 'error');
             return;
@@ -43,22 +42,21 @@ const AddToCalendarButton = ({ contest, user, showNotification }) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contest }),
-                credentials: 'include', // Sends session cookie for authentication
+                credentials: 'include',
             });
 
             const result = await response.json();
 
             if (!response.ok) {
-                // Throw an error with the message from the backend if it exists
                 throw new Error(result.message || 'Failed to create event.');
             }
             
-            // 2. Use the notification component for success messages
             showNotification(result.message || 'Event added to calendar!', 'success');
+            // Notify the parent component of the success
+            onAddSuccess(contest._id);
 
         } catch (error) {
             console.error('Error adding to calendar:', error);
-            // 3. Use the notification component for error messages
             showNotification(error.message || 'Could not add event to calendar.', 'error');
         } finally {
             setIsAdding(false);
@@ -68,11 +66,15 @@ const AddToCalendarButton = ({ contest, user, showNotification }) => {
     return (
         <button
             onClick={handleCalendarClick}
-            disabled={isAdding}
-            className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium disabled:opacity-50"
+            disabled={isAdding || isAdded} // Disable if adding or already added
+            className={`flex items-center gap-2 text-sm font-medium disabled:opacity-60 transition-colors ${
+                isAdded 
+                ? 'text-green-600 dark:text-green-400 cursor-default' 
+                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+            }`}
         >
-            <Calendar size={16} />
-            {isAdding ? 'Adding...' : 'Add to Google Calendar'}
+            {isAdded ? <CheckCircle size={16} /> : <Calendar size={16} />}
+            {isAdding ? 'Adding...' : isAdded ? 'Added' : 'Add to Google Calendar'}
         </button>
     );
 };
@@ -116,7 +118,7 @@ const Header = ({ theme, setTheme, isScrolled, setPage, page, user }) => {
 };
 
 // ContestCard Component: Displays individual contest information
-const ContestCard = ({ contest, onSave, user, showNotification }) => {
+const ContestCard = ({ contest, onSave, user, showNotification, onAddToCalendar, isAddedToCalendar }) => {
   const platformColorMap = {
     'Codeforces': 'bg-rose-500', 'LeetCode': 'bg-amber-500', 'HackerEarth': 'bg-blue-500', 'TopCoder': 'bg-indigo-500',
   };
@@ -137,8 +139,7 @@ const ContestCard = ({ contest, onSave, user, showNotification }) => {
       <div className="flex justify-between items-center mt-auto">
         <div className="flex items-center gap-4 flex-wrap">
             {contest.status === 'Past' && contest.solutionUrl && (<a href={`https://www.youtube.com/watch?v=${contest.solutionUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 font-medium"><Youtube size={16} /> Solution</a>)}
-            {/* Pass the required props down to the button */}
-            {contest.status === 'Upcoming' && <AddToCalendarButton contest={contest} user={user} showNotification={showNotification} />}
+            {contest.status === 'Upcoming' && <AddToCalendarButton contest={contest} user={user} showNotification={showNotification} onAddSuccess={onAddToCalendar} isAdded={isAddedToCalendar} />}
             <a href={contest.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium"><ExternalLink size={16} /> Visit</a>
         </div>
         {user && (<button onClick={() => onSave(contest._id, !contest.saved)} className={`flex items-center gap-2 text-sm px-4 py-2 rounded-md transition-colors font-semibold ${ contest.saved ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'}`}><Bookmark size={16} /> {contest.saved ? 'Saved' : 'Save'}</button>)}
@@ -193,7 +194,7 @@ const Footer = () => (
 export default function App() {
   const [theme, setTheme] = useState('dark');
   const [page, setPage] = useState('home');
-  const [activeTab, setActiveTab] = useState('Upcoming'); // Default tab set to 'Upcoming'
+  const [activeTab, setActiveTab] = useState('Upcoming');
   const [selectedPlatform, setSelectedPlatform] = useState('All Platforms');
   const [isScrolled, setIsScrolled] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -202,6 +203,8 @@ export default function App() {
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
   const [user, setUser] = useState(null);
+  // New state to track contests added to the calendar in the current session
+  const [addedToCalendarIds, setAddedToCalendarIds] = useState(new Set());
 
   const platformOptions = [
     { value: 'All Platforms', label: 'All Platforms', color: 'text-gray-800 dark:text-white' },
@@ -211,20 +214,17 @@ export default function App() {
     { value: 'TopCoder', label: 'TopCoder', color: 'text-indigo-500' }
   ];
 
-  // Effect for theme switching
   useEffect(() => {
     if (theme === 'dark') { document.documentElement.classList.add('dark'); } 
     else { document.documentElement.classList.remove('dark'); }
   }, [theme]);
 
-  // Effect for header styling on scroll
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Effect to fetch initial data (user and contests)
   useEffect(() => {
     const fetchData = async () => {
         setIsLoading(true);
@@ -248,10 +248,8 @@ export default function App() {
     fetchData();
   }, []);
 
-  // Helper function to show notifications
   const showNotification = (message, type = 'success') => { setNotification({ message, type }); };
   
-  // Helper function to handle saving/unsaving contests
   const handleToggleSave = async (contestId, newSavedStatus) => {
     if (!user) { showNotification('Please log in to save contests.', 'error'); return; }
     const originalContests = [...allContests];
@@ -270,12 +268,15 @@ export default function App() {
         showNotification('Failed to update bookmark.', 'error');
     }
   };
+
+  // New handler to update the set of added calendar events
+  const handleContestAddedToCalendar = (contestId) => {
+    setAddedToCalendarIds(prevIds => new Set(prevIds).add(contestId));
+  };
   
-  // Memoized function to filter contests based on current state
   const filteredContests = useMemo(() => {
     let contests = allContests;
     
-    // Filter by page (bookmarks, today)
     if (page === 'bookmarks') {
       contests = contests.filter(c => c.saved);
     } else if (page === 'today') {
@@ -288,14 +289,12 @@ export default function App() {
       });
     }
     
-    // Filter by search query
     if (searchQuery) {
         contests = contests.filter(contest => 
             contest.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }
 
-    // Final filter by status and platform for the home page
     return contests.filter(contest => {
       const statusMatch = (page === 'today' || page === 'bookmarks') ? true : contest.status === activeTab;
       const platformMatch = selectedPlatform === 'All Platforms' || contest.platform === selectedPlatform;
@@ -303,7 +302,6 @@ export default function App() {
     });
   }, [page, activeTab, selectedPlatform, allContests, searchQuery]);
 
-  // Helper function to get the correct page title
   const getPageTitle = () => {
     if (page === 'bookmarks') return 'My Bookmarks';
     if (page === 'today') return "Today's Contests";
@@ -343,7 +341,17 @@ export default function App() {
           : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContests.length > 0 ? (
-                filteredContests.map((contest) => (<ContestCard key={contest._id} contest={contest} onSave={handleToggleSave} user={user} showNotification={showNotification}/>))
+                filteredContests.map((contest) => (
+                    <ContestCard 
+                        key={contest._id} 
+                        contest={contest} 
+                        onSave={handleToggleSave} 
+                        user={user} 
+                        showNotification={showNotification}
+                        onAddToCalendar={handleContestAddedToCalendar}
+                        isAddedToCalendar={addedToCalendarIds.has(contest._id)}
+                    />
+                ))
               ) : ( <p className="text-gray-500 dark:text-gray-400 col-span-full text-center py-10">No contests found for the selected filters.</p> )}
             </div>
           )}
