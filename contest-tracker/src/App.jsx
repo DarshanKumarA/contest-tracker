@@ -11,21 +11,31 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 // Individual Notification Component
 // Manages its own slide-in/slide-out animation
 const Notification = ({ id, message, type, onDismiss }) => {
-    const [isExiting, setIsExiting] = useState(false);
+    const [isVisible, setIsVisible] = useState(false);
 
+    // This effect runs once on mount to trigger the slide-in animation
     useEffect(() => {
-        // Set a timer to automatically dismiss the notification
-        const timer = setTimeout(() => {
-            setIsExiting(true); // Trigger the slide-out animation
-            // Wait for the animation to finish before removing from the DOM
+        // We use a short timeout to ensure the component is in the DOM and has its initial (off-screen) styles applied before we start the animation. This prevents the "pop-in" effect.
+        const enterTimer = setTimeout(() => {
+            setIsVisible(true);
+        }, 100); 
+        
+        // This effect sets the timer for the notification to automatically dismiss
+        const dismissTimer = setTimeout(() => {
+            setIsVisible(false); // Trigger the exit animation
+            // Wait for the animation to complete before removing the component from the state
             setTimeout(() => onDismiss(id), 500); 
         }, 4000); // Notification stays for 4 seconds
 
-        return () => clearTimeout(timer);
+        // Cleanup timers on unmount
+        return () => {
+            clearTimeout(enterTimer);
+            clearTimeout(dismissTimer);
+        };
     }, [id, onDismiss]);
 
     const handleDismiss = () => {
-        setIsExiting(true);
+        setIsVisible(false);
         setTimeout(() => onDismiss(id), 500);
     };
     
@@ -35,7 +45,7 @@ const Notification = ({ id, message, type, onDismiss }) => {
     return (
         <div 
             className={`transform transition-all duration-500 ease-in-out flex items-center w-full max-w-sm p-4 rounded-lg text-white shadow-lg mb-4 ${
-                isExiting ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'
+                isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
             } ${bgColor}`}
             onClick={handleDismiss}
         >
@@ -240,7 +250,6 @@ export default function App() {
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
   
-  // State is now an array to handle multiple notifications
   const [notifications, setNotifications] = useState([]);
 
   const platformOptions = [
@@ -285,16 +294,16 @@ export default function App() {
     fetchData();
   }, []);
 
-  // Updated function to add a new notification to the array
   const showNotification = (message, type = 'success') => {
     const newNotification = { id: Date.now(), message, type };
-    setNotifications(prev => [newNotification, ...prev]); // Add new notifications to the top
+    setNotifications(prev => [newNotification, ...prev]);
   };
 
-  // Function to remove a notification by its ID
-  const dismissNotification = (id) => {
+  // We wrap dismissNotification in useCallback to prevent it from being recreated on every render.
+  // This gives it a stable identity, which is crucial for the useEffect hook in the Notification component.
+  const dismissNotification = React.useCallback((id) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
-  };
+  }, []);
   
   const handleToggleSave = async (contestId, newSavedStatus) => {
     if (!user) { showNotification('Please log in to save contests.', 'error'); return; }
@@ -359,7 +368,6 @@ export default function App() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-[#121212] text-gray-800 dark:text-gray-200 font-sans">
-      {/* Render the new NotificationContainer */}
       <NotificationContainer notifications={notifications} onDismiss={dismissNotification} />
       <Header theme={theme} setTheme={setTheme} isScrolled={isScrolled} setPage={setPage} page={page} user={user} />
       <main className="flex-grow p-4 sm:p-6 md:p-8">
