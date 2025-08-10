@@ -200,100 +200,75 @@ const fetchAndStoreContests = async () => {
     }
 };
 
-const extractSearchKeywords = (contestName, platform) => {
-    if (platform === 'LeetCode') {
-        // Extracts "Weekly Contest 460" -> ["Weekly", "Contest", "460"]
-        return contestName.replace('Biweekly ', '').split(' ');
-    }
+// NEW FUNCTION: To build the precise search query
+const buildSearchQuery = (contestName, platform) => {
     if (platform === 'Codeforces') {
-        // Extracts "Codeforces Round #1039 (Div. 2)" -> ["Codeforces", "1039", "Div", "2"]
-        const match = contestName.match(/Codeforces Round.*?(\d+).*?(Div\.\s*(\d+))?/);
-        if (match) {
-            const keywords = ['Codeforces', match[1]];
-            if (match[3]) {
-                keywords.push('Div', match[3]);
+        const roundMatch = contestName.match(/Round.*?(\d+)/);
+        const divMatch = contestName.match(/Div\.?\s*(\d+)/i); // The dot is now optional
+        
+        if (roundMatch) {
+            let query = `Codeforces Round ${roundMatch[1]}`;
+            if (divMatch) {
+                query += ` (Div ${divMatch[1]}) solution`;
             }
-            return keywords;
+            return query;
         }
     }
-    // Fallback for other platforms
-    return contestName.split(' ');
+
+    if (platform === 'LeetCode') {
+        const typeMatch = contestName.match(/(Weekly|Biweekly)/i);
+        const numberMatch = contestName.match(/(\d+)/);
+
+        if (typeMatch && numberMatch) {
+            // Capitalize "Weekly" or "Biweekly" properly
+            const contestType = typeMatch[1].charAt(0).toUpperCase() + typeMatch[1].slice(1).toLowerCase();
+            return `LeetCode ${contestType} Contest ${numberMatch[1]} solution`;
+        }
+    }
+
+    // Fallback for other platforms or if regex fails
+    return `${contestName} solution`;
 };
 
+// NEW SIMPLIFIED FUNCTION: To find the solution on YouTube
 const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
     const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3/search';
-    const TLE_ELIMINATORS_CHANNEL_ID = 'UCfaJ6P3Q60-wGzE0sS1j_ew';
+    const searchQuery = buildSearchQuery(contestName, platform);
 
-    // Step 1: Get a broad list of recent completed streams from the channel.
-    // We do NOT use a text query here to ensure we get a good list to analyze.
+    console.log(`Searching YouTube for: "${searchQuery}"`);
+
     const params = {
         part: 'snippet',
         key: process.env.YOUTUBE_API_KEY,
-        maxResults: 20, // Get a larger list to be safe
+        maxResults: 5,
         type: 'video',
-        order: 'date', // Get the most recent videos first
+        order: 'relevance',
+        q: searchQuery,
     };
-
-    if (platform === 'Codeforces' || platform === 'LeetCode') {
-        params.channelId = TLE_ELIMINATORS_CHANNEL_ID;
-        params.q = platform; 
-        console.log(`Fetching recent '${platform}' videos from TLE_Eliminators to find solution for "${contestName}"`);
-    } else {
-        // For other platforms, we still rely on a general search
-        params.q = `"${contestName}" solution`;
-        console.log(`Performing a general YouTube search for: "${params.q}"`);
-    }
 
     try {
         const response = await axios.get(YOUTUBE_API_URL, { params });
 
         if (!response.data.items || response.data.items.length === 0) {
-            console.log(`No recent streams found for "${contestName}" yet.`);
+            console.log(`No video found for query: "${searchQuery}"`);
             return null;
         }
 
-        // Step 2: Analyze the results with our own scoring logic
-        const keywords = extractSearchKeywords(contestName, platform);
-        let bestMatch = { score: 0, video: null };
-
-        console.log(`Analyzing ${response.data.items.length} videos with keywords: [${keywords.join(', ')}]`);
-
-        for (const video of response.data.items) {
-            const title = video.snippet.title.toLowerCase();
-            let currentScore = 0;
-
-            for (const keyword of keywords) {
-                if (title.includes(keyword.toLowerCase())) {
-                    currentScore++;
-                }
-            }
-
-            if (currentScore > bestMatch.score) {
-                bestMatch = { score: currentScore, video: video };
-            }
-        }
-
-        // Step 3: Validate the best match
-        const MINIMUM_SCORE_THRESHOLD = 2;
-        if (bestMatch.score >= MINIMUM_SCORE_THRESHOLD) {
-            const video = bestMatch.video;
-            const videoPublishDate = new Date(video.snippet.publishedAt);
-            const contestEndDate = new Date(contestEndTime);
-            
-            // Time validation: ensure the video was published within 7 days after the contest ended
-            const timeDifference = videoPublishDate.getTime() - contestEndDate.getTime();
-            const daysDifference = timeDifference / (1000 * 3600 * 24);
-
-            if (daysDifference >= 0 && daysDifference <= 7) {
-                console.log(`SUCCESS: Found valid match: "${video.snippet.title}" (ID: ${video.id.videoId})`);
-                return video.id.videoId;
-            } else {
-                console.log(`Found a potential match ("${video.snippet.title}"), but it was published outside the valid time window.`);
-            }
-        }
+        const bestVideo = response.data.items[0]; 
         
-        console.log(`No video met the minimum score and time requirements for "${contestName}".`);
-        return null;
+        const videoPublishDate = new Date(bestVideo.snippet.publishedAt);
+        const contestEndDate = new Date(contestEndTime);
+        
+        const timeDifference = videoPublishDate.getTime() - contestEndDate.getTime();
+        const daysDifference = timeDifference / (1000 * 3600 * 24);
+
+        if (daysDifference >= 0 && daysDifference <= 7) {
+            console.log(`SUCCESS: Found relevant video: "${bestVideo.snippet.title}"`);
+            return bestVideo.id.videoId;
+        } else {
+            console.log(`Found a video ("${bestVideo.snippet.title}"), but its publish date was outside the valid window.`);
+            return null;
+        }
 
     } catch (error) {
         console.error('Error fetching from YouTube API:', error.response ? error.response.data.error.message : error.message);
