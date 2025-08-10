@@ -232,7 +232,6 @@ const findYouTubeSolution = async (contestName, contestEndTime, platform) => {
         maxResults: 20, // Get a larger list to be safe
         type: 'video',
         order: 'date', // Get the most recent videos first
-        eventType: 'completed'
     };
 
     if (platform === 'Codeforces' || platform === 'LeetCode') {
