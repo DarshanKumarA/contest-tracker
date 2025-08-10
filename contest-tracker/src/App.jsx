@@ -11,7 +11,7 @@ const Notification = ({ message, type, onDismiss }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             onDismiss();
-        }, 2000);
+        }, 3000); // Increased time to 3 seconds for better readability
         return () => clearTimeout(timer);
     }, [onDismiss]);
 
@@ -27,41 +27,51 @@ const Notification = ({ message, type, onDismiss }) => {
 };
 
 // AddToCalendarButton Component: Handles adding events to Google Calendar
-const AddToCalendarButton = ({ contest }) => {
+const AddToCalendarButton = ({ contest, user, showNotification }) => {
     const [isAdding, setIsAdding] = useState(false);
 
     const handleCalendarClick = async () => {
+        // 1. Check if user is logged in *before* making an API call
+        if (!user) {
+            showNotification('Please log in to use this feature.', 'error');
+            return;
+        }
+
         setIsAdding(true);
         try {
             const response = await fetch(`${API_BASE_URL}/api/calendar-event`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contest }), 
+                body: JSON.stringify({ contest }),
                 credentials: 'include', // Sends session cookie for authentication
             });
 
-            if (!response.ok) {
-                throw new Error('Failed to create event.');
-            }
-
             const result = await response.json();
-            alert(result.message); 
+
+            if (!response.ok) {
+                // Throw an error with the message from the backend if it exists
+                throw new Error(result.message || 'Failed to create event.');
+            }
+            
+            // 2. Use the notification component for success messages
+            showNotification(result.message || 'Event added to calendar!', 'success');
 
         } catch (error) {
             console.error('Error adding to calendar:', error);
-            alert('Could not add event to calendar.');
+            // 3. Use the notification component for error messages
+            showNotification(error.message || 'Could not add event to calendar.', 'error');
         } finally {
             setIsAdding(false);
         }
     };
 
     return (
-        <button 
-            onClick={handleCalendarClick} 
+        <button
+            onClick={handleCalendarClick}
             disabled={isAdding}
             className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium disabled:opacity-50"
         >
-            <Calendar size={16} /> 
+            <Calendar size={16} />
             {isAdding ? 'Adding...' : 'Add to Google Calendar'}
         </button>
     );
@@ -106,7 +116,7 @@ const Header = ({ theme, setTheme, isScrolled, setPage, page, user }) => {
 };
 
 // ContestCard Component: Displays individual contest information
-const ContestCard = ({ contest, onSave, user }) => {
+const ContestCard = ({ contest, onSave, user, showNotification }) => {
   const platformColorMap = {
     'Codeforces': 'bg-rose-500', 'LeetCode': 'bg-amber-500', 'HackerEarth': 'bg-blue-500', 'TopCoder': 'bg-indigo-500',
   };
@@ -127,7 +137,8 @@ const ContestCard = ({ contest, onSave, user }) => {
       <div className="flex justify-between items-center mt-auto">
         <div className="flex items-center gap-4 flex-wrap">
             {contest.status === 'Past' && contest.solutionUrl && (<a href={`https://www.youtube.com/watch?v=${contest.solutionUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 font-medium"><Youtube size={16} /> Solution</a>)}
-            {contest.status === 'Upcoming' && <AddToCalendarButton contest={contest} />}
+            {/* Pass the required props down to the button */}
+            {contest.status === 'Upcoming' && <AddToCalendarButton contest={contest} user={user} showNotification={showNotification} />}
             <a href={contest.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium"><ExternalLink size={16} /> Visit</a>
         </div>
         {user && (<button onClick={() => onSave(contest._id, !contest.saved)} className={`flex items-center gap-2 text-sm px-4 py-2 rounded-md transition-colors font-semibold ${ contest.saved ? 'bg-gray-900 dark:bg-white text-white dark:text-black' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'}`}><Bookmark size={16} /> {contest.saved ? 'Saved' : 'Save'}</button>)}
@@ -332,7 +343,7 @@ export default function App() {
           : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContests.length > 0 ? (
-                filteredContests.map((contest) => (<ContestCard key={contest._id} contest={contest} onSave={handleToggleSave} user={user}/>))
+                filteredContests.map((contest) => (<ContestCard key={contest._id} contest={contest} onSave={handleToggleSave} user={user} showNotification={showNotification}/>))
               ) : ( <p className="text-gray-500 dark:text-gray-400 col-span-full text-center py-10">No contests found for the selected filters.</p> )}
             </div>
           )}
