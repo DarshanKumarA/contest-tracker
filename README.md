@@ -104,6 +104,7 @@ To get a local copy up and running, follow these simple steps.
 You will need to create two `.env` files for this project to run locally.
 
 **1. Backend (`/server/.env`):**
+```sh
 MONGO_URI=your_mongodb_connection_string
 SESSION_SECRET=a_super_secret_random_string
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -111,4 +112,5 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 YOUTUBE_API_KEY=your_youtube_api_key
 FRONTEND_URL=http://localhost:5173
 GOOGLE_CALLBACK_URL=http://localhost:5000/auth/google/callback
-**2. Frontend (`/contest-tracker/.env`):**
+```
+
