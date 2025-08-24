@@ -1,126 +1,229 @@
-# ⚖️ Nyay AI (न्याय AI)
+# 🏆 Contest Tracker
+
+
+
+[![Live Site](https://img.shields.io/badge/Live%20Site-online-green)](https://contest-tracker-darsh.vercel.app)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.116-blue?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-19-blue?logo=react&logoColor=white)](https://reactjs.org/)
 
-An AI-powered intelligence engine designed to accelerate justice in the Indian legal system by transforming unstructured case files into interactive, intelligent briefs.
+
+
+A full-stack MERN-based web application to track upcoming and past coding contests from multiple platforms, featuring Google Calendar integration and secure user authentication.
+
+
+
+**[➡️ View the Live Application](https://contest-tracker-darshu.vercel.app)**
+
+
 
 ---
 
+
+
 ## 📋 About The Project
 
-Nyay AI addresses a critical challenge in the Indian judicial system: the overwhelming backlog of over 47 million pending cases, largely due to a manual, paper-based process. This application serves as a secure intelligence engine for legal professionals, ingesting thousands of pages of legal documents and converting them into a single, dynamic, and interactive "Intelligent Brief."
 
-Inspired by the vision of the Hon'ble Justice D.Y. Chandrachud, Chief Justice of India, this project aims to use modern AI to bring unprecedented speed and clarity to case analysis, ultimately helping to reduce delays and restore faith in the justice system.
+
+Contest Tracker solves a common problem for competitive programmers: keeping track of coding contests spread across multiple websites. This application aggregates contest data from Codeforces, LeetCode, HackerEarth, and TopCoder into a single, clean interface. Users can log in with their Google account to save contests, add events directly to their Google Calendar, and find YouTube solutions for past contests automatically.
+
+
 
 ## ✨ Key Features
 
-* ✅ **Intelligent Brief Generation**: Automatically generates multi-layered summaries, key arguments, and involved parties from uploaded case files (PDF or TXT).
-* ✅ **Real-time Precedent Analysis**: Finds the most relevant historical cases from a personal vector database using advanced semantic search.
-* ✅ **Evidentiary Cross-Verification**: Flags potential contradictions in evidence across multiple documents for human review.
-* ✅ **Interactive Chat Assistant**: A conversational AI that can answer follow-up questions about the analyzed case document.
-* ✅ **AI Personalization**: Allows users to provide feedback to fine-tune a personalized model, improving future search results over time.
-* ✅ **Secure User Authentication**: A complete user management system with secure JWT-based authentication and password hashing.
-* ✅ **Fully Responsive UI**: The user interface is designed to work seamlessly across different devices.
+
+
+* ✅ **Multi-Platform Aggregation:** View contests from Codeforces, LeetCode, HackerEarth, and TopCoder.
+
+* ✅ **Secure Google OAuth 2.0:** Users can sign up and log in securely with their Google account.
+
+* ✅ **Google Calendar Integration:** Add any upcoming contest to your personal Google Calendar with a single click.
+
+* ✅ **Bookmark Contests:** Save contests for later and view them in a dedicated bookmarks page.
+
+* ✅ **Automated Solution Finder:** The backend automatically searches for YouTube video solutions for past contests.
+
+* ✅ **"Today's Contests" View:** Quickly see all contests happening on the current day.
+
+* ✅ **Search & Filter:** Easily search for contests by name and filter by platform.
+
+* ✅ **Dark/Light Mode:** A sleek, modern UI with theme-switching capability.
+
+* ✅ **Fully Responsive:** Designed to work beautifully on all devices, from desktops to mobile phones.
+
+
 
 ## 🛠️ Tech Stack
 
-This project was built using a modern, full-stack architecture.
+
+
+This project was built using a modern MERN-stack architecture within a monorepo.
+
+
 
 * **Frontend:**
-    * [React](https://reactjs.org/) (with Vite)
-    * React Router for navigation
-    * React Context for state management
-    * Axios for API Communication
+
+    * [React](https://reactjs.org/) (with Vite)
+
+    * [Tailwind CSS](https://tailwindcss.com/)
+
+    * React Hooks for State Management
+
+    * Axios for API Calls
+
+
 
 * **Backend:**
-    * [FastAPI](https://fastapi.tiangolo.com/) (with Uvicorn)
-    * [SQLAlchemy](https://www.sqlalchemy.org/) ORM
-    * [Pydantic](https://pydantic-docs.helpmanual.io/) for data validation
-    * JWT (python-jose) & passlib for authentication
 
-* **Database:**
-    * [PostgreSQL](https://www.postgresql.org/) (Production-ready)
-    * [SQLite](https://www.sqlite.org/index.html) (for local development)
+    * [Node.js](https://nodejs.org/)
 
-* **AI & Machine Learning:**
-    * [Google Gemini API](https://ai.google.dev/) for generative tasks
-    * [Sentence-Transformers](https://www.sbert.net/) for text embeddings
-    * [ChromaDB](https://www.trychroma.com/) for vector storage and similarity search
-    * [LangChain](https://www.langchain.com/) for text splitting
-    * [Spacy](https://spacy.io/) for NLP tasks
+    * [Express.js](https://expressjs.com/)
+
+    * [MongoDB](https://www.mongodb.com/) (with Mongoose)
+
+    * [Passport.js](http://www.passportjs.org/) for Google OAuth 2.0
+
+    * `express-session` for Session Management
+
+
+
+* **APIs:**
+
+    * Google Calendar API
+
+    * YouTube Data API
+
+
+
+* **Deployment:**
+
+    * Frontend: **Vercel**
+
+    * Backend: **Render**
+
+    * CI/CD pipeline managed from a single GitHub monorepo.
+
+
 
 ## 🚀 Getting Started (Local Setup)
 
+
+
 To get a local copy up and running, follow these simple steps.
+
+
 
 ### Prerequisites
 
+
+
 * Node.js (v18 or later)
-* Python (v3.9 or later)
-* npm & pip
+
+* npm
+
 * Git
+
+
 
 ### Installation
 
-1.  **Clone the repository:**
-    ```sh
-    git clone [https://github.com/DarshanKumarA/nyay-ai.git](https://github.com/DarshanKumarA/nyay-ai.git)
-    cd nyay-ai
-    ```
 
-2.  **Setup the Backend (`/backend`):**
-    * Navigate to the backend directory:
-        ```sh
-        cd backend
-        ```
-    * Create and activate a Python virtual environment:
-        ```sh
-        # On Windows
-        python -m venv venv
-        .\venv\Scripts\activate
 
-        # On macOS / Linux
-        python3 -m venv venv
-        source venv/bin/activate
-        ```
-    * Install Python packages:
-        ```sh
-        pip install -r requirements.txt
-        ```
-    * Create a `.env` file in the `/backend` directory and add the required environment variables (see below).
-    * Start the server:
-        ```sh
-        uvicorn main:app --reload
-        ```
-    > The backend will be running at `http://127.0.0.1:8000`.
+1.  **Clone the repository:**
 
-3.  **Setup the Frontend (`/frontend`):**
-    * Open a **new terminal** and navigate to the frontend directory:
-        ```sh
-        cd frontend
-        ```
-    * Install NPM packages:
-        ```sh
-        npm install
-        ```
-    * Start the client:
-        ```sh
-        npm run dev
-        ```
-    > The frontend will be running at `http://localhost:5173`.
+    ```sh
+
+    git clone [https://github.com/your-username/contest-tracker.git](https://github.com/your-username/contest-tracker.git)
+
+    cd contest-tracker
+
+    ```
+
+
+
+2.  **Setup the Backend (`/server`):**
+
+    * Navigate to the server directory:
+
+        ```sh
+
+        cd server
+
+        ```
+
+    * Install NPM packages:
+
+        ```sh
+
+        npm install
+
+        ```
+
+    * Create a `.env` file in the `/server` directory and add the required environment variables (see below).
+
+    * Start the server:
+
+        ```sh
+
+        node index.js
+
+        ```
+
+
+
+3.  **Setup the Frontend (`/contest-tracker`):**
+
+    * From the root directory, navigate to the frontend directory:
+
+        ```sh
+
+        cd contest-tracker
+
+        ```
+
+    * Install NPM packages:
+
+        ```sh
+
+        npm install
+
+        ```
+
+    * Create a `.env` file in the `/contest-tracker` directory and add `VITE_API_BASE_URL`.
+
+    * Start the client:
+
+        ```sh
+
+        npm run dev
+
+        ```
+
+
 
 ## 🔑 Environment Variables
 
-You will need to create one `.env` file for this project to run locally.
 
-**Backend (`/backend/.env`):**
+
+You will need to create two `.env` files for this project to run locally.
+
+
+
+**1. Backend (`/server/.env`):**
+
 ```sh
-# A strong, random string used for signing JWTs
-SECRET_KEY="your_super_secret_key_here"
 
-# Your API key from Google AI Studio
-GEMINI_API_KEY="your_gemini_api_key_here"
+MONGO_URI=your_mongodb_connection_string
 
+SESSION_SECRET=a_super_secret_random_string
+
+GOOGLE_CLIENT_ID=your_google_client_id
+
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+YOUTUBE_API_KEY=your_youtube_api_key
+
+FRONTEND_URL=http://localhost:5173
+
+GOOGLE_CALLBACK_URL=http://localhost:5000/auth/google/callback
+
+```
